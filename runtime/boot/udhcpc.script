@@ -1,0 +1,35 @@
+#!/bin/sh
+set -eu
+read -r pid1 < /proc/1/comm
+[ "$pid1" = ventuno-init ] || [ -f /etc/ventuno-revision-network ] || exit 2
+case "${interface:-}" in ''|*[!a-zA-Z0-9_.:-]*) exit 2 ;; esac
+case "${1:-}" in
+    deconfig)
+        ip -4 addr flush dev "$interface"
+        rm -f /run/ventuno-dhcp.state
+        ;;
+    bound|renew)
+        ifconfig "$interface" "$ip" netmask "${subnet:-255.255.255.0}" up
+        gateway=${router:-}
+        gateway=${gateway%% *}
+        if [ -n "$gateway" ]; then
+            ip route replace default via "$gateway" dev "$interface"
+        fi
+        # /etc is the volatile initramfs or container overlay.
+        rm -f /etc/resolv.conf
+        for server in ${dns:-}; do printf 'nameserver %s\n' "$server"; done > /etc/resolv.conf
+        {
+            echo 'DHCP_BOUND=1'
+            echo "interface=$interface"
+            echo "address=$ip"
+            echo "subnet=${subnet:-}"
+            echo "gateway=$gateway"
+        } > /run/ventuno-dhcp.state.tmp
+        mv /run/ventuno-dhcp.state.tmp /run/ventuno-dhcp.state
+        # Host-side DHCP is volatile. Core owns its own persistent DHCP state.
+        echo "[VENTUNO] DHCP_BOUND: $interface $ip"
+        if [ -w /dev/kmsg ]; then
+            printf '<5>[VENTUNO] DHCP_BOUND: %s %s\n' "$interface" "$ip" > /dev/kmsg
+        fi
+        ;;
+esac

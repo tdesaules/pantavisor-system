@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+[ -f /etc/ventuno-autonomous ] || exit 0
+case "${PV_OP:-}" in
+    system-install-update)
+        case "${PV_TRY:-}" in locals/*) name=${PV_TRY#locals/} ;; 0) name=0 ;; *) exit 2 ;; esac
+        case "$name" in ''|.|..|*[!a-zA-Z0-9_.-]*) exit 2 ;; esac
+        [ "${#name}" -le 64 ] || exit 2
+        directory=/mnt/ubuntu-trial/boot/pantavisor
+        [ ! -f /etc/ventuno-native ] || directory=/mnt/pv-system/boot/pantavisor
+        for pair in 'kernel.img kernel' 'pantavisor initramfs'; do
+            set -- $pair
+            incoming=$(sha256sum "/storage/trails/$PV_TRY/bsp/$1")
+            installed=$(sha256sum "$directory/$2")
+            [ "${incoming%% *}" = "${installed%% *}" ] || { echo 'BSP update not supported by this fixed-BSP boot entry'; exit 3; }
+        done
+        /usr/sbin/ventuno-bootctl clear-attempt
+        ;;
+    system-boot-done) /usr/sbin/ventuno-bootctl clear-attempt ;;
+esac

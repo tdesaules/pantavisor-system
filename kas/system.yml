@@ -1,0 +1,59 @@
+header:
+  version: 16
+machine: ventuno-q
+distro: panta-distro-bsp
+target:
+  - pantavisor-initramfs
+repos:
+  project:
+    path: .
+    layers:
+      build/meta-system:
+  meta-pantavisor:
+    url: https://github.com/pantavisor/meta-pantavisor.git
+    commit: cac393c28b0e44c5229fef6f1c516c3ec6bc87bb
+    path: artifacts/meta-pantavisor
+  poky:
+    url: https://github.com/yoctoproject/poky.git
+    commit: b2c16f1e69130558574e1363aff944647fa9cd11
+    path: artifacts/layers/poky
+    layers:
+      meta:
+      meta-poky:
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded.git
+    commit: b5874ea07d69919d9b40d59f2c2f0bbd24bc3259
+    path: artifacts/layers/meta-openembedded
+    layers:
+      meta-oe:
+      meta-python:
+      meta-networking:
+      meta-filesystems:
+  meta-virtualization:
+    url: https://git.yoctoproject.org/meta-virtualization
+    commit: f980aefbc8b3eeafb8d144e7fdac3c3b701a4fea
+    path: artifacts/layers/meta-virtualization
+local_conf_header:
+  system: |
+    TCLIBC = "musl"
+    PACKAGE_CLASSES = "package_rpm"
+    INITRAMFS_FSTYPES = "cpio.gz"
+    BB_NUMBER_THREADS = "4"
+    PARALLEL_MAKE = "-j 4"
+    INHERIT += "rm_work"
+    DISTRO_FEATURES:append = " pantavisor-system"
+    PANTAVISOR_FEATURES:append = " automod dm-crypt dm-verity"
+    PANTAVISOR_FEATURES:remove = " autogrow tailscale runc xconnect-dbus-systembus"
+    PREFERRED_VERSION_pvgo-binary-native = "1.24.13"
+    PACKAGECONFIG:append:pn-kmod = " zstd"
+    PACKAGE_INSTALL:append:pn-pantavisor-initramfs = " ventuno-trial-guard util-linux-blkid"
+    PANTAVISOR_CONFIG[PV_SYSTEM_INIT_MODE] = "standalone"
+    PANTAVISOR_CONFIG[PV_BOOTLOADER_TYPE] = "grub"
+    PANTAVISOR_CONFIG[PV_STORAGE_DEVICE] = "LABEL=pvstore"
+    PANTAVISOR_CONFIG[PV_CONTROL_REMOTE] = "0"
+    PANTAVISOR_CONFIG[PV_SYSTEM_DRIVERS_LOAD_EARLY_AUTO] = "1"
+    PANTAVISOR_CONFIG[PV_DEBUG_SHELL] = "0"
+    PANTAVISOR_CONFIG[PV_DEBUG_SHELL_AUTOLOGIN] = "0"
+    PANTAVISOR_CONFIG[PV_DEBUG_SSH] = "0"
+    DL_DIR = "/work/artifacts/downloads"
+    SSTATE_DIR = "/work/artifacts/sstate-cache"

@@ -1,0 +1,38 @@
+From: Ventuno integration <ventuno@localhost>
+Subject: [PATCH] storage: allow deferred image-loop releases to finish at shutdown
+
+The backing store can briefly remain busy after image volume teardown, while
+AUTOCLEAR loop references are released. Retry EBUSY for at most two seconds;
+do not use lazy unmount, hide permanent errors or reboot with an avoidable
+mounted store.
+
+Upstream-Status: Pending
+---
+diff --git a/storage.c b/storage.c
+--- a/storage.c
++++ b/storage.c
+@@ -1254,9 +1254,21 @@ void pv_storage_umount()
+ 		return;
+ 
+ 	pv_paths_storage(path, PATH_MAX);
+-	if (umount(path))
+-		pv_log(ERROR, "could not umount '%s': %s", path,
+-		       strerror(errno));
++	pv_fs_path_sync(path);
++	for (int attempt = 0; ; attempt++) {
++		if (!umount(path)) {
++			if (attempt)
++				pv_log(INFO, "unmounted '%s' after %d retries",
++				       path, attempt);
++			break;
++		}
++		if (errno != EBUSY || attempt == 20) {
++			pv_log(ERROR, "could not umount '%s': %s", path,
++			       strerror(errno));
++			break;
++		}
++		usleep(100000);
++	}
+ 	pv_fs_path_sync(path);
+ }
+ 

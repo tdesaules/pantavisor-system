@@ -1,0 +1,17 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Construire le socle System
+    cmds:
+      - task: build
+
+  build:
+    desc: Construire l’initramfs System avec KAS/Yocto
+    cmds:
+      - python3 -m tools.pvbuild build
+
+  check:
+    desc: Vérifier les contrats, les tests, la syntaxe et la documentation
+    cmds:
+      - python3 -m tools.pvbuild check

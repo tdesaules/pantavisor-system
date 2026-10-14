@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+while :; do
+    if /usr/sbin/ventuno-bootctl health /proc/1/root/run/pantavisor/pv/pv-ctrl > /ventuno-trial/health.tmp; then
+        mv /ventuno-trial/health.tmp /ventuno-trial/health.status
+    fi
+    sleep 5
+done

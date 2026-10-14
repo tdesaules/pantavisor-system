@@ -1,0 +1,22 @@
+#!/bin/sh
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mkdir -p /proc /sys /dev /run /tmp /mnt
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts
+mount -t devpts devpts /dev/pts
+mount -t tmpfs tmpfs /run
+mount -t tmpfs tmpfs /tmp
+exec </dev/console >/dev/console 2>&1
+echo VENTUNO_RECOVERY_STARTED
+touch /run/ventuno-recovery
+/usr/sbin/ventuno-load-drivers
+/usr/sbin/ventuno-network &
+echo 'Recovery runs in RAM; system and NVMe filesystems are not mounted.'
+echo 'Use blkid, mount and e2fsck explicitly. Reboot with reboot -f.'
+echo VENTUNO_RECOVERY_READY
+while :; do
+    setsid /bin/sh -c 'exec /bin/sh </dev/console >/dev/console 2>&1'
+    sleep 1
+done

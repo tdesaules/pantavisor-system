@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "grubModules": {
+    "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/g/grub2-unsigned/grub-efi-arm64-bin_2.12-1ubuntu7.3_arm64.deb",
+    "sha256": "d43219525621449cd795dd0a932f28729ea7da391115d84436c90521ab30ed31",
+    "directory": "usr/lib/grub/arm64-efi"
+  }
+}

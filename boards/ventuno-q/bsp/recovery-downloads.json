@@ -1,0 +1,16 @@
+{
+  "files": [
+    {
+      "name": "arduino-flasher-cli-0.5.4-linux-amd64.tar.gz",
+      "url": "https://github.com/arduino/arduino-flasher-cli/releases/download/v0.5.4/arduino-flasher-cli-0.5.4-linux-amd64.tar.gz",
+      "sha256": "c174c5c800f4b95f3e267c3a9b37f8c2716ea87b7dfa491d810753bbba31b6b5"
+    },
+    {
+      "name": "arduino-ventunoq-ubuntu-24.04-desktop-arm64-image-x13-20260729-248.tar.zst",
+      "url": "https://people.canonical.com/~platform/images/qualcomm-iot/ventunoq/ubuntu-desktop-24.04/20260729-248/arduino-ventunoq-ubuntu-24.04-desktop-arm64-image-x13-20260729-248.tar.zst",
+      "sha256": "d04b8d290986a2f1dd3ac446ce46d085483dc99f911af8fcd7106bec77ca6369",
+      "kernel_release": "6.8.0-1080-qcom",
+      "source_index": "https://downloads.arduino.cc/ubuntu-im/Stable/info.json"
+    }
+  ]
+}

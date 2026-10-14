@@ -1,0 +1,5 @@
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+SRC_URI += "file://0001-preserve-early-platform-readiness.patch"
+SRC_URI += "file://0002-ventuno-unified-cgroups.patch"
+SRC_URI += "file://0003-retry-busy-storage-unmount.patch"
+SRC_URI += "file://0004-prefer-curl-for-pvcontrol.patch"

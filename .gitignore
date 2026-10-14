@@ -1,0 +1,6 @@
+artifacts/
+dist/
+__pycache__/
+.venv/
+.task/
+*.local.json

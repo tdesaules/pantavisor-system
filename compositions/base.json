@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "platform": "ventuno-q",
+  "architecture": "arm64",
+  "bootContract": "emmc-file-store-v1",
+  "layers": ["base"],
+  "bsp": "bsp",
+  "containers": {
+    "core": {
+      "artifact": "core",
+      "memoryMiB": 512,
+      "cpuWeight": 200,
+      "settings": {"sshPort": 2222, "ntpServers": ["time.cloudflare.com", "pool.ntp.org"]}
+    }
+  }
+}

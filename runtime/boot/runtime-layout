@@ -1,0 +1,13 @@
+# Sourced only by host-side boot helpers with a validated install/trial ID.
+root=/mnt/ubuntu-trial
+[ ! -f /etc/ventuno-native ] || root=/mnt/pv-system
+if [ -f /etc/ventuno-autonomous ]; then
+    directory="$root/boot/pantavisor"
+    marker="$directory/install-id"
+    boot_id=$(cat /proc/sys/kernel/random/boot_id)
+    logfile="$directory/logs/$boot_id.log"
+else
+    directory="$root/boot/pantavisor-diagnostic/$id"
+    marker="$directory/trial-id"
+    logfile="$directory/trial.log"
+fi

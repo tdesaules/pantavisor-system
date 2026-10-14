@@ -1,0 +1,88 @@
+#!/bin/sh
+# The static supervisor has already validated the marker, mounted the log root
+# and written/fsynced the first trace without any shell/Pantavisor dependency.
+set -u
+id=${1:-}
+case "$id" in ''|*[!0-9a-fA-F]*) exit 2 ;; esac
+[ "${#id}" -eq 32 ] && [ "${2:-}" = --mounted ] || exit 2
+. /usr/lib/ventuno/runtime-layout
+cleanup() { sync; exec >/dev/console 2>&1; umount "$root"; }
+trap cleanup EXIT
+trap 'exit 143' TERM INT
+[ "$(cat "$marker" 2>/dev/null)" = "$id" ] || exit 7
+echo 'BOOTSTRAP_STAGE=DIAGNOSTIC_SHELL_STARTED'
+date -u
+uname -a
+cat /proc/cmdline /proc/1/status
+sync
+echo '### Explicit driver loading, including display'
+result=0
+/usr/sbin/ventuno-load-drivers || result=$?
+echo "DRIVER_CHECK_EXIT=$result"
+echo '### Pantavisor executable'
+/usr/bin/pantavisor --version
+echo "PANTAVISOR_VERSION_EXIT=$?"
+echo '### Persistent root readable'
+[ ! -f "$root/etc/os-release" ] || cat "$root/etc/os-release"
+echo '### Block devices and network'
+cat /proc/partitions
+ip link
+echo '### NVMe read-only sample'
+if [ -f /etc/ventuno-app-storage.conf ]; then
+    dd if=/dev/nvme0n1 of=/dev/null bs=1M count=16
+    echo "NVME_READ_EXIT=$?"
+fi
+echo '### Display'
+for path in /sys/class/graphics/fb*/name /sys/class/drm/card*-*/status; do
+    if [ -f "$path" ]; then echo "$path"; cat "$path"; fi
+done
+echo '### Supervisor and Pantavisor child'
+sleep 8
+cat /run/ventuno-guard.status
+cat /run/ventuno-supervisor.log
+cat /run/pantavisor-child.log 2>/dev/null || true
+echo '### DHCP and SSH'
+if [ -f /etc/ventuno-network.conf ] || [ -f /etc/ventuno-revision-network ]; then
+    attempt=0
+    while [ ! -f /run/ventuno-dhcp.state ] && [ "$attempt" -lt 25 ]; do
+        if [ -f /etc/ventuno-revision-network ] && [ -f /run/ventuno-runtime.pid ]; then
+            read -r pvpid < /run/ventuno-runtime.pid
+            state="/proc/$pvpid/root/storage/disks/perm/core/data/dhcp.state"
+            if [ -f "$state" ]; then cp "$state" /run/ventuno-dhcp.state; fi
+        fi
+        sleep 1
+        attempt=$((attempt + 1))
+    done
+    cat /run/ventuno-dhcp.state 2>/dev/null || true
+    cat /run/ventuno-network.log 2>/dev/null || true
+    ip -4 address
+    ip route
+    if [ -f /etc/ventuno-revision-network ]; then
+        echo 'NETWORK_OWNER=core'
+        cat /run/ventuno-guard.status
+    fi
+fi
+echo '### Wireless interface snapshot'
+wifi_count=0
+for path in /sys/class/net/*/wireless; do
+    if [ -d "$path" ]; then echo "$path"; wifi_count=$((wifi_count + 1)); fi
+done
+echo "WIFI_INTERFACE_COUNT=$wifi_count"
+for attr in identity state timeout; do
+    cat "/sys/class/watchdog/watchdog0/$attr" 2>/dev/null || true
+done
+echo '### Kernel log'
+if [ -f /etc/ventuno-embedded.config ]; then
+    echo '### Embedded runtime validation'
+    sleep 25
+    result=0
+    /usr/sbin/ventuno-runtime-status || result=$?
+    echo "RUNTIME_STATUS_EXIT=$result"
+    cat /run/pantavisor-child.log 2>/dev/null || true
+    if [ -f /etc/ventuno-pid1 ]; then cat /ventuno-trial/guard.status; fi
+fi
+echo "HOST_PID1_NAME=$(cat /proc/1/comm)"
+echo "HOST_PID1_EXE=$(readlink /proc/1/exe)"
+dmesg
+echo "TRIAL_DIAGNOSTICS_COMPLETE=$id"
+sync

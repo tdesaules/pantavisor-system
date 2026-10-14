@@ -1,0 +1,48 @@
+#!/bin/sh
+# Observe native shutdown regardless of its cause; never stop the runtime here.
+set -eu
+id=${1:-}
+case "$id" in ''|*[!0-9a-f]*) exit 2 ;; esac
+[ "${#id}" -eq 32 ] && [ -f /etc/ventuno-pid1 ] || exit 2
+. /usr/lib/ventuno/runtime-layout
+if [ "${2:-}" != --inside ]; then
+    nsenter -t 1 -m -- /usr/sbin/ventuno-storage-watch "$id" --inside
+    attempt=0
+    while grep -q " $root " /proc/mounts; do
+        if umount "$root"; then break; fi
+        attempt=$((attempt + 1))
+        [ "$attempt" -le 10 ] || exit 4
+        sleep 0.1
+    done
+    echo '<5>[VENTUNO] PANTAVISOR_NATIVE_SHUTDOWN_COMPLETE=1' > /dev/kmsg
+    exit
+fi
+. /usr/lib/ventuno/runtime-layout
+[ "$(cat "$marker")" = "$id" ] || exit 3
+echo 'STORAGE_AUTOCLEAR_ARMED=1' >> "$logfile"
+while [ -f /sys/class/block/loop32/loop/backing_file ]; do sleep 0.1; done
+/usr/sbin/ventuno-bootctl stop-diagnostics
+if grep -q ' /mnt/appdata ' /proc/mounts; then
+    umount /mnt/appdata
+    echo 'APPDATA_CLEANLY_UNMOUNTED=1' >> "$logfile"
+fi
+{
+    echo 'PANTAVISOR_STORAGE_UNMOUNTED=1'
+    echo 'RUNTIME_CLEANUP_UNMOUNT_FAILURES=0'
+} >> "$logfile"
+if [ -f /etc/ventuno-autonomous ]; then
+    next=pantavisor
+    if [ -f /ventuno-trial/control/next ]; then read -r next < /ventuno-trial/control/next || next=ubuntu; fi
+    case "$next" in
+        pantavisor) action=arm ;;
+        *) action=clear ;;
+    esac
+    if /usr/sbin/ventuno-bootctl "$action"; then
+        echo "AUTONOMOUS_NEXT=$next" >> "$logfile"
+    else
+        echo 'AUTONOMOUS_BOOT_SELECTION_FAILED=1' >> "$logfile"
+    fi
+fi
+sync
+umount "$root"
+touch /ventuno-trial/storage-released

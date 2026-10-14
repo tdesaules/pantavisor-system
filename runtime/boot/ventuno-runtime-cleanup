@@ -1,0 +1,81 @@
+#!/bin/sh
+# Stop only this private runtime and release the file-backed filesystem cleanly.
+set -eu
+read -r init < /proc/1/comm
+[ "$init" = ventuno-init ] || exit 2
+id=${1:-}
+case "$id" in ''|*[!0-9a-f]*) exit 2 ;; esac
+[ "${#id}" -eq 32 ] || exit 2
+if [ "${2:-}" != --inside ]; then
+    mkdir /run/ventuno-runtime-cleanup.lock 2>/dev/null || exit 0
+    read -r pid < /run/ventuno-runtime.pid
+    case "$pid" in ''|*[!0-9]*) exit 2 ;; esac
+    exec nsenter -t "$pid" -m -- /usr/sbin/ventuno-runtime-cleanup "$id" --inside
+fi
+socket=/run/pantavisor/pv/pv-ctrl
+pvcontrol -s "$socket" containers stop diagnostic || true
+if [ -f /etc/ventuno-revision-network ]; then
+    pvcontrol -s "$socket" containers stop core || true
+fi
+sleep 2
+namespace=$(readlink /proc/self/ns/mnt)
+# The outer supervisor is in a different mount namespace.
+for signal in TERM KILL; do
+    for path in /proc/[0-9]*; do
+        pid=${path##*/}
+        [ "$pid" = "$$" ] && continue
+        if [ "$(readlink "$path/ns/mnt" 2>/dev/null || true)" = "$namespace" ]; then
+            kill -"$signal" "$pid" 2>/dev/null || true
+        fi
+    done
+    sleep 1
+done
+failed=0
+: > /tmp/ventuno-unmount-failures
+while read -r source target type rest; do
+    case "$target" in
+        /volumes/*|/exports/*|/run/pantavisor/*|/usr/lib/lxc/rootfs*) echo "$target" ;;
+    esac
+done < /proc/mounts | sort -r > /tmp/ventuno-unmount-list
+while read -r target; do
+    if ! umount "$target"; then
+        failed=$((failed + 1))
+        echo "UNMOUNT_FAILED=$target" >> /tmp/ventuno-unmount-failures
+    fi
+done < /tmp/ventuno-unmount-list
+# LXC/Pantavisor loop mounts are not AUTOCLEAR in this runtime version.
+# Release only the reserved range backed by objects in this private store.
+number=64
+while [ "$number" -lt 128 ]; do
+    backing=/sys/class/block/loop$number/loop/backing_file
+    if [ -f "$backing" ]; then
+        case "$(cat "$backing")" in
+            /storage/trails/*|/storage/objects/*)
+                losetup -d "/dev/loop$number" || failed=$((failed + 1)) ;;
+            *) echo "LOOP_NOT_OWNED=loop$number" >> /tmp/ventuno-unmount-failures ;;
+        esac
+    fi
+    number=$((number + 1))
+done
+if ! umount /storage; then
+    sleep 2
+    if ! umount /storage; then
+        failed=$((failed + 1))
+        echo 'UNMOUNT_FAILED=/storage' >> /tmp/ventuno-unmount-failures
+    fi
+fi
+if [ "$failed" -eq 0 ]; then
+    case "$(cat /sys/class/block/loop32/loop/backing_file)" in
+        */"$id"/pvstore.ext4) losetup -d /dev/loop32 ;;
+        *) echo 'Unexpected backing file; refusing detach'; exit 3 ;;
+    esac
+fi
+echo "RUNTIME_CLEANUP_UNMOUNT_FAILURES=$failed"
+echo "RUNTIME_CLEANUP_UNMOUNT_FAILURES=$failed" >> "/mnt/ubuntu-trial/boot/pantavisor-diagnostic/$id/trial.log"
+cat /tmp/ventuno-unmount-failures >> "/mnt/ubuntu-trial/boot/pantavisor-diagnostic/$id/trial.log"
+sync
+if [ "$failed" -eq 0 ]; then
+    umount /mnt/ubuntu-trial
+    echo 'RUNTIME_STORAGE_CLEANLY_RELEASED=1'
+fi
+test "$failed" -eq 0

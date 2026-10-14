@@ -1,0 +1,10 @@
+{
+  "name": "ventuno-q",
+  "architecture": "arm64",
+  "machine": "ventuno-q",
+  "bootContracts": ["emmc-file-store-v1"],
+  "statusSource": "/ventuno-trial",
+  "controlSource": "/ventuno-trial/control",
+  "applicationSource": "/mnt/appdata/perm/k0s",
+  "storageFilesystem": "ext4"
+}

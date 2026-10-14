@@ -1,0 +1,7 @@
+{
+  "containers": {
+    "k0s": {
+      "settings": {"maxPods": 60, "podCIDR": "10.200.0.0/16", "serviceCIDR": "10.112.0.0/12"}
+    }
+  }
+}

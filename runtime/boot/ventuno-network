@@ -1,0 +1,48 @@
+#!/bin/sh
+# Volatile Ethernet DHCP and key-only SSH, owned by the host OR its revision.
+set -eu
+read -r pid1 < /proc/1/comm
+[ "$pid1" = ventuno-init ] || [ -f /etc/ventuno-revision-network ] || exit 2
+[ -f /etc/ventuno-network.conf ] || exit 0
+. /etc/ventuno-network.conf
+mkdir -p /run/dropbear
+iface=
+attempt=0
+while [ -z "$iface" ] && [ "$attempt" -lt 40 ]; do
+    for path in /sys/class/net/*; do
+        [ -e "$path/device/driver" ] || continue
+        driver=$(readlink -f "$path/device/driver")
+        driver=${driver##*/}
+        case "$driver" in
+            qcom-ethqos|virtio_net) iface=${path##*/}; break ;;
+        esac
+    done
+    if [ -z "$iface" ]; then sleep 1; attempt=$((attempt + 1)); fi
+done
+[ -n "$iface" ] || { echo 'ETHERNET_DEVICE_NOT_FOUND'; exit 3; }
+ip link set dev "$iface" down
+# The lab profile preserves this board's Ubuntu MAC/DHCP identity.
+if [ "$driver" = qcom-ethqos ]; then
+    ip link set dev "$iface" address "$ETHERNET_MAC"
+fi
+ip link set dev "$iface" up
+echo "ETHERNET_INTERFACE=$iface"
+echo "ETHERNET_MAC=$(cat "/sys/class/net/$iface/address")"
+/usr/sbin/dropbear -F -E -s -j -k -p "$SSH_PORT" \
+    -P /run/dropbear.pid -r /etc/dropbear/dropbear_ed25519_host_key &
+sshd=$!
+udhcpc -f -i "$iface" -t 6 -T 3 -A 10 \
+    -p /run/udhcpc.pid -s /usr/lib/ventuno/udhcpc.script &
+dhcp=$!
+cleanup() {
+    kill "$sshd" "$dhcp" 2>/dev/null || true
+    wait "$sshd" 2>/dev/null || true
+    wait "$dhcp" 2>/dev/null || true
+    ip -4 addr flush dev "$iface" || true
+}
+trap cleanup EXIT
+trap 'exit 143' TERM INT
+echo "SSH_PORT=$SSH_PORT"
+while kill -0 "$sshd" 2>/dev/null && kill -0 "$dhcp" 2>/dev/null; do sleep 2; done
+echo 'NETWORK_PROCESS_EXITED'
+exit 1

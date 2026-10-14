@@ -1,0 +1,49 @@
+#!/bin/sh
+# Mount only an already provisioned application disk. Never format at boot.
+set -eu
+. /etc/ventuno-app-storage.conf
+target=/mnt/appdata
+mkdir -p "$target"
+emulated=0
+case " $(cat /proc/cmdline) " in *' ventuno_trace_device=/dev/vda '*) emulated=1 ;; esac
+device=
+attempt=0
+while [ -z "$device" ] && [ "$attempt" -lt 20 ]; do
+    for path in /dev/nvme*n*p* /dev/vd[b-z]; do
+        [ -b "$path" ] || continue
+        case "$path" in /dev/vd*) [ "$emulated" -eq 1 ] || continue ;; esac
+        found=$(blkid -p -s UUID -o value "$path" 2>/dev/null || true)
+        [ "$found" = "$APPDATA_UUID" ] || continue
+        [ -z "$device" ] || { echo 'APPDATA_UUID_AMBIGUOUS'; exit 3; }
+        device=$path
+    done
+    if [ -z "$device" ]; then sleep 1; attempt=$((attempt + 1)); fi
+done
+[ -n "$device" ] || { echo 'APPDATA_UUID_NOT_FOUND'; exit 4; }
+case "$device" in /dev/nvme*)
+    base=${device##*/}
+    base=${base%%p*}
+    controller=${base%n*}
+    # NVMe serial fields are fixed-width and sysfs retains padding spaces.
+    read -r observed_serial < "/sys/class/nvme/$controller/serial"
+    [ "$observed_serial" = "$APPDATA_SERIAL" ] || { echo 'APPDATA_SERIAL_MISMATCH'; exit 5; }
+    [ "$(blkid -p -s PART_ENTRY_UUID -o value "$device")" = "$APPDATA_PARTUUID" ] || { echo 'APPDATA_PARTUUID_MISMATCH'; exit 5; }
+    ;;
+esac
+[ "$(blkid -p -s TYPE -o value "$device")" = ext4 ] || exit 6
+mount -t ext4 -o ro,noload,nosuid,nodev "$device" "$target"
+if [ "$(cat "$target/.ventuno-app-storage" 2>/dev/null || true)" != "ventuno-appdata-v1 $APPDATA_UUID" ] ||
+   [ ! -d "$target/perm" ] || [ -L "$target/perm" ]; then
+    umount "$target"
+    echo 'APPDATA_MARKER_INVALID'
+    exit 7
+fi
+umount "$target"
+mount -t ext4 -o nosuid,nodev "$device" "$target"
+{
+    echo 'APPDATA_MOUNTED=1'
+    echo "APPDATA_DEVICE=$device"
+    echo "APPDATA_UUID=$APPDATA_UUID"
+    echo 'APPDATA_FILESYSTEM=ext4'
+} > /ventuno-trial/app-storage.status
+cat /ventuno-trial/app-storage.status

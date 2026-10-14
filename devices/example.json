@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "rootUUID": "REPLACE_WITH_EMMC_ROOT_FILESYSTEM_UUID",
+  "memoryKiB": 15651824,
+  "ethernetMAC": "02:00:00:00:00:01",
+  "ethernetInterface": "eth0",
+  "authorizedKeys": ["ssh-ed25519 REPLACE_WITH_PUBLIC_KEY"],
+  "appStorage": {
+    "uuid": "REPLACE_WITH_NVME_FILESYSTEM_UUID",
+    "partuuid": "REPLACE_WITH_NVME_PARTITION_UUID",
+    "serial": "REPLACE_WITH_NVME_SERIAL"
+  }
+}

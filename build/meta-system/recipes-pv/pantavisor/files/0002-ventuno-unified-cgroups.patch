@@ -1,0 +1,60 @@
+From: Ventuno integration <ventuno@localhost>
+Subject: [PATCH] cgroup: opt in to unified hierarchy for the Ventuno bootstrap
+
+The board marker selects a unified hierarchy before any legacy controllers
+are mounted. Keep PID 1 at the root (exempt from the no-internal-process rule)
+and enable available controllers for LXC's child hierarchies.
+
+Upstream-Status: Inappropriate [board integration opt-in]
+---
+diff --git a/cgroup.c b/cgroup.c
+--- a/cgroup.c
++++ b/cgroup.c
+@@ -215,6 +215,37 @@ static int pv_cgroup_init_appengine()
+ 
+ 	return 0;
+ }
++
++static int ventuno_cgroup_init_unified(void)
++{
++	char controllers[512];
++	mkdir("/sys/fs/cgroup", 0755);
++	if (mount("cgroup2", "/sys/fs/cgroup", "cgroup2",
++		  MS_NOSUID | MS_NOEXEC | MS_NODEV, "nsdelegate"))
++		return -1;
++	FILE *f = fopen("/sys/fs/cgroup/cgroup.controllers", "r");
++	if (!f)
++		return -1;
++	if (!fgets(controllers, sizeof(controllers), f)) {
++		fclose(f);
++		return -1;
++	}
++	fclose(f);
++	char *save, *controller = strtok_r(controllers, " \n", &save);
++	while (controller) {
++		f = fopen("/sys/fs/cgroup/cgroup.subtree_control", "w");
++		if (!f)
++			return -1;
++		int result = fprintf(f, "+%s\n", controller);
++		int closed = fclose(f);
++		if (result < 0 || closed)
++			return -1;
++		controller = strtok_r(NULL, " \n", &save);
++	}
++	pv_get_instance()->cgroupv = CGROUP_UNIFIED;
++	return 0;
++}
++
+ int pv_cgroup_init()
+ {
+ 	// IM_APPENGINE supports all cgroup versions
+@@ -222,6 +253,9 @@ int pv_cgroup_init()
+ 	if (pv_config_get_system_init_mode() == IM_APPENGINE)
+ 		return pv_cgroup_init_appengine();
+ 
++	if (!access("/etc/ventuno-cgroup-v2", F_OK))
++		return ventuno_cgroup_init_unified();
++
+ 	if (pv_cgroup_mkcgroup_root())
+ 		return -1;
+ 

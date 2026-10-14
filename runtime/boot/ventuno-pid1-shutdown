@@ -1,0 +1,19 @@
+#!/bin/sh
+# Normal timed return. The storage watcher also handles update/rollback reboots.
+set -eu
+id=${1:-}
+case "$id" in ''|*[!0-9a-f]*) exit 2 ;; esac
+[ "${#id}" -eq 32 ] && [ -f /etc/ventuno-pid1 ] || exit 2
+read -r init < /proc/1/comm
+[ "$init" = pantavisor ] || exit 2
+if [ "${2:-}" != --inside ]; then
+    exec nsenter -t 1 -m -- /usr/sbin/ventuno-pid1-shutdown "$id" --inside
+fi
+. /usr/lib/ventuno/runtime-layout
+[ "$(cat "$marker")" = "$id" ] || exit 3
+socket=/run/pantavisor/pv/pv-ctrl
+pvcontrol -s "$socket" containers stop diagnostic
+pvcontrol -s "$socket" containers stop core
+echo 'PANTAVISOR_REBOOT_REQUESTED=1' >> "$logfile"
+sync
+pvcontrol -s "$socket" cmd reboot

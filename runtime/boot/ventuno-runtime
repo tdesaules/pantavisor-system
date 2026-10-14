@@ -1,0 +1,41 @@
+#!/bin/sh
+# Runs in the private mount namespace created by the supervisor.
+set -eu
+id=${1:-}
+case "$id" in ''|*[!0-9a-f]*) exit 2 ;; esac
+[ "${#id}" -eq 32 ] || exit 2
+. /usr/lib/ventuno/runtime-layout
+image="$directory/pvstore.ext4"
+[ -f "$image" ] && [ ! -L "$image" ] || exit 3
+if [ -f /etc/ventuno-app-storage.conf ]; then
+    if /usr/sbin/ventuno-app-storage >> "$logfile" 2>&1; then
+        echo 'APPDATA_READY_BEFORE_PANTAVISOR'
+    else
+        echo 'APPDATA_UNAVAILABLE=1' >> "$logfile"
+        echo '<5>[VENTUNO] APPDATA_UNAVAILABLE=1' > /dev/kmsg
+        # Keep management available without silently writing app data to eMMC.
+        # A revision requiring NVMe will fail its mounts and follow recovery.
+        # Core-only revisions do not use this path and can remain accessible.
+        mount -t tmpfs -o ro,nosuid,nodev,noexec,size=4k none /mnt/appdata
+        echo 'APPDATA_MOUNTED=0' > /ventuno-trial/app-storage.status
+    fi
+fi
+[ -b /dev/loop32 ] || mknod /dev/loop32 b 7 32
+if losetup /dev/loop32 >/dev/null 2>&1; then
+    echo 'Refusing to reuse an occupied loop device'; exit 4
+fi
+losetup /dev/loop32 "$image"
+echo 'RUNTIME_STORAGE_ATTACHED=/dev/loop32'
+if [ -f /etc/ventuno-pid1 ]; then
+    [ "$$" -eq 1 ] || exit 5
+    # Pantavisor PID 1 owns its early mounts. Release our copies in this private
+    # namespace, keeping console descriptors on a node in the initramfs itself.
+    mknod -m 600 /ventuno-console c 5 1
+    exec </ventuno-console >/ventuno-console 2>&1
+    umount /run
+    umount /dev/pts
+    umount /dev
+    umount /sys
+    umount /proc
+fi
+exec /usr/bin/pantavisor --config /etc/ventuno-embedded.config pv_embedded

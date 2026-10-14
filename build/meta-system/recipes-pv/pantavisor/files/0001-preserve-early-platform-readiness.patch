@@ -1,0 +1,38 @@
+From: Ventuno integration <ventuno@localhost>
+Subject: [PATCH] platforms: preserve readiness received before the start callback
+
+The signal socket may deliver READY before the LXC PID pipe is dispatched.
+Only advance STARTING to STARTED in the pipe callback: retain READY and do
+not resurrect a platform already being stopped. PID and console setup must
+still run. Reject readiness outside the running startup lifecycle.
+
+Upstream-Status: Pending
+---
+diff --git a/platforms.c b/platforms.c
+--- a/platforms.c
++++ b/platforms.c
+@@ -1139,7 +1139,11 @@ static void _read_platform_pipefd_cb(int fd, short event, void *arg)
+ 
+ 	pv_log(DEBUG, "started platform '%s' with pid %d", p->name,
+ 	       p->init_pid);
+-	pv_platform_set_status(p, PLAT_STARTED);
++	/* READY can arrive on the control socket before this PID notification.
++	 * Complete startup bookkeeping without regressing readiness or a stop.
++	 */
++	if (p->status.current == PLAT_STARTING)
++		pv_platform_set_status(p, PLAT_STARTED);
+ }
+ 
+ int pv_platform_start(struct pv_platform *p)
+@@ -1488,6 +1492,11 @@ int pv_platform_set_ready(struct pv_platform *p)
+ 	if (p->status.goal != PLAT_READY)
+ 		return -1;
+ 
++	if (p->status.current != PLAT_STARTING &&
++	    p->status.current != PLAT_STARTED &&
++	    p->status.current != PLAT_READY)
++		return -1;
++
+ 	pv_platform_set_status(p, PLAT_READY);
+ 	return 0;
+ }

@@ -1,0 +1,37 @@
+{
+  "kernel_release": "6.8.0-1084-qcom",
+  "scope": "Ethernet-only Ventuno BSP with cgroup v2 and Kubernetes network prerequisites.",
+  "wifi_enabled": false,
+  "module_seeds": [
+    "ext4", "overlay", "nvme", "usb_storage", "uas", "vfat", "exfat", "nls_cp437", "nls_iso8859_1",
+    "dwmac_qcom_ethqos", "qca808x", "phy_qcom_sgmii_eth",
+    "xhci_pci", "xhci_plat_hcd", "dwc3_qcom", "ucsi_ccg", "usbhid", "hid_generic", "hid_multitouch",
+    "cdc_acm", "gs_usb", "libcomposite", "usb_f_ecm", "usb_f_ncm",
+    "qcom_q6v5_pas", "qcom_glink_smem", "qcom_sysmon", "qrtr_smd",
+    "qcom_rng", "qcom_wdt", "rtc_pm8xxx", "pm8941_pwrkey", "qcom_pon", "gpio_keys",
+    "qcom_tsens", "qcom_spmi_temp_alarm", "qcom_spmi_adc5_gen3", "qcom_spmi_mbg_tm",
+    "nvmem_qcom_spmi_sdam", "gpi", "icc_bwmon", "icc_osm_l3", "llcc_qcom", "qmi_cooling",
+    "qcom_edac", "qcom_eud", "ina2xx", "i2c_gpio", "spi_geni_qcom",
+    "bridge", "br_netfilter", "veth", "nf_conntrack", "nf_conntrack_netlink", "nf_nat", "nf_tables", "nft_chain_nat", "nft_compat",
+    "ip_tables", "iptable_filter", "iptable_nat", "iptable_mangle", "iptable_raw",
+    "ip6_tables", "ip6table_filter", "ip6table_nat", "ip6table_mangle", "ip6table_raw",
+    "xt_MASQUERADE", "xt_nat", "xt_NFLOG", "xt_nfacct", "xt_addrtype", "xt_conntrack", "xt_comment", "xt_mark", "xt_multiport", "xt_set", "xt_statistic", "xt_tcpudp",
+    "xt_REDIRECT", "ipt_REJECT", "ip6t_REJECT", "xt_CT", "xt_connmark", "xt_limit", "xt_physdev",
+    "ip_set", "ip_set_hash_ip", "ip_set_hash_net", "ip_set_hash_ipport", "ip_set_hash_netnet", "ip_set_hash_netport", "ip_set_hash_ipportnet",
+    "ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "ipip", "vxlan", "nfnetlink_log", "nfnetlink_acct",
+    "dm_crypt", "dm_verity", "msm", "adv7511", "dispcc0_sa8775p", "gpucc_sa8775p", "phy_qcom_edp", "display_connector"
+  ],
+  "firmware_required": [
+    "qcom/qcs8300/qupv3fw.elf", "qcom/qcs8300/adsp.mbn", "qcom/qcs8300/cdsp0.mbn",
+    "qcom/qcs8300/gpdsp0.mbn", "qcom/qps615.bin", "qcom/a650_sqe.fw", "qcom/a623_gmu.bin", "qcom/qcs8300/a623_zap.mbn"
+  ],
+  "firmware_optional_patterns": ["qcom/qcs8300/*", "updates/qcom/qcs8300/*"],
+  "early_modules": [
+    "qcom_tsens", "qcom_spmi_temp_alarm", "qcom_spmi_mbg_tm", "qcom_rng",
+    "nvme", "dwmac_qcom_ethqos", "qca808x", "phy_qcom_sgmii_eth",
+    "xhci_pci", "xhci_plat_hcd", "dwc3_qcom", "ucsi_ccg",
+    "usbhid", "hid_generic", "usb_storage", "uas", "cdc_acm", "overlay",
+    "bridge", "br_netfilter", "veth", "nf_conntrack", "ip_tables", "iptable_nat", "iptable_filter",
+    "dispcc0_sa8775p", "gpucc_sa8775p", "phy_qcom_edp", "display_connector", "adv7511", "msm"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "kernelRelease": "6.8.0-1084-qcom",
+  "kernelSha256": "46dd8c27ee63eaec164bf97d0fe9fa4de29a4afe2daef541df9e4303dc9f9a11",
+  "kernelConfigSha256": "ee8c765a073e7cd87547cc4970b603aca216bed0037d7dc62ee9792d1365b6b9",
+  "selection": "boards/ventuno-q/bsp/ventuno-q-1084-k0s-selection.json",
+  "packages": [
+    {
+      "name": "linux-image",
+      "url": "https://ports.ubuntu.com/ubuntu-ports/pool/universe/l/linux-qcom/linux-image-6.8.0-1084-qcom_6.8.0-1084.89_arm64.deb",
+      "sha256": "542fb57c6e5cfa7f42ef6353a02bd576734fba0db8d2cc921f4a1382f90b51ba"
+    },
+    {
+      "name": "linux-modules",
+      "url": "https://ports.ubuntu.com/ubuntu-ports/pool/universe/l/linux-qcom/linux-modules-6.8.0-1084-qcom_6.8.0-1084.89_arm64.deb",
+      "sha256": "37be6eede46622613ee16a17dcaedb2bad19e08f843650596055cc4bf7b540e0"
+    },
+    {
+      "name": "linux-firmware-qualcomm-graphics",
+      "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux-firmware-qualcomm-graphics/linux-firmware-qualcomm-graphics_20240318.git3b128b60-0ubuntu3.1_all.deb",
+      "sha256": "8a64c938780949a680214001a8b917d14444d9776e53b59bb73204fd6f7c297f"
+    },
+    {
+      "name": "linux-firmware-qualcomm-misc",
+      "url": "https://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux-firmware-qualcomm-misc/linux-firmware-qualcomm-misc_20240318.git3b128b60-0ubuntu3.1_all.deb",
+      "sha256": "42a54c2a2f20c8a394719e047714be1e968af48bc556fd836ef005b430011721"
+    },
+    {
+      "name": "linux-firmware-dragonwing",
+      "url": "https://launchpad.net/~ubuntu-qcom-iot/+archive/ubuntu/qcom-ppa/+files/linux-firmware-dragonwing_20260612_arm64.deb",
+      "sha256": "0967315821a9bc71a1b038a96f29eec141e2ad33668acd20ccb901eb759f7f08"
+    }
+  ]
+}

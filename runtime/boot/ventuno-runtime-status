@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+read -r pid < /run/ventuno-runtime.pid
+case "$pid" in ''|*[!0-9]*) exit 2 ;; esac
+base="/proc/$pid/root"
+socket="$base/run/pantavisor/pv/pv-ctrl"
+lock=/run/ventuno-runtime-query.lock
+attempt=0
+until mkdir "$lock" 2>/dev/null; do
+    attempt=$((attempt + 1))
+    [ "$attempt" -le 5 ] || exit 3
+    sleep 1
+done
+trap 'rm -rf "$lock"' EXIT
+case "${1:-status}" in
+    status) ;;
+    *) exit 2 ;;
+esac
+echo '### Pantavisor containers'
+pvcontrol -s "$socket" containers ls
+echo '### Current revision'
+pvcontrol -s "$socket" steps get current
+echo '### Revisions and update history'
+pvcontrol -s "$socket" steps ls
+echo '### Core persistent state'
+data="$base/storage/disks/perm/core/data"
+cat "$data/boots" "$data/dhcp.state"

@@ -1,0 +1,27 @@
+From: Ventuno integration <ventuno@localhost>
+Subject: [PATCH] pvcontrol: prefer curl when the full client is installed
+
+Use curl's independent request handling for concurrent administration, keeping
+the minimal pvcurl fallback for initramfs environments without curl. Explicit
+CURL_CMD overrides remain supported.
+
+Upstream-Status: Pending
+---
+diff --git a/tools/pvcontrol b/tools/pvcontrol
+--- a/tools/pvcontrol
++++ b/tools/pvcontrol
+@@ -14,7 +14,13 @@ response=''
+ signal=''
+ daemon_name=''
+ 
+-CURL_CMD=${CURL_CMD:-pvcurl}
++if [ -z "$CURL_CMD" ]; then
++	if command -v curl >/dev/null 2>&1; then
++		CURL_CMD=curl
++	else
++		CURL_CMD=pvcurl
++	fi
++fi
+ 
+ if ! command -v $CURL_CMD >/dev/null 2>&1; then
+ 	CURL_CMD="curl"
