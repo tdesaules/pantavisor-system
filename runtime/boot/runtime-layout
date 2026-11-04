@@ -1,4 +1,7 @@
 # Sourced only by host-side boot helpers with a validated install/trial ID.
+# shellcheck shell=sh
+# marker/logfile are the sourced interface consumed by those helpers.
+# shellcheck disable=SC2034
 root=/mnt/ubuntu-trial
 [ ! -f /etc/ventuno-native ] || root=/mnt/pv-system
 if [ -f /etc/ventuno-autonomous ]; then
@@ -7,6 +10,8 @@ if [ -f /etc/ventuno-autonomous ]; then
     boot_id=$(cat /proc/sys/kernel/random/boot_id)
     logfile="$directory/logs/$boot_id.log"
 else
+    # The caller validates and supplies id before sourcing this file.
+    # shellcheck disable=SC2154
     directory="$root/boot/pantavisor-diagnostic/$id"
     marker="$directory/trial-id"
     logfile="$directory/trial.log"

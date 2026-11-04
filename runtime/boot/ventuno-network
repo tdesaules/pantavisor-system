@@ -4,6 +4,8 @@ set -eu
 read -r pid1 < /proc/1/comm
 [ "$pid1" = ventuno-init ] || [ -f /etc/ventuno-revision-network ] || exit 2
 [ -f /etc/ventuno-network.conf ] || exit 0
+# This configuration is generated for the selected device.
+# shellcheck source=/dev/null
 . /etc/ventuno-network.conf
 mkdir -p /run/dropbear
 iface=
@@ -34,6 +36,8 @@ sshd=$!
 udhcpc -f -i "$iface" -t 6 -T 3 -A 10 \
     -p /run/udhcpc.pid -s /usr/lib/ventuno/udhcpc.script &
 dhcp=$!
+# Invoked indirectly by the EXIT trap below.
+# shellcheck disable=SC2329
 cleanup() {
     kill "$sshd" "$dhcp" 2>/dev/null || true
     wait "$sshd" 2>/dev/null || true

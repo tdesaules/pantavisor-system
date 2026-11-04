@@ -4,6 +4,7 @@ set -eu
 id=${1:-}
 case "$id" in ''|*[!0-9a-f]*) exit 2 ;; esac
 [ "${#id}" -eq 32 ] || exit 2
+# shellcheck source=runtime-layout
 . /usr/lib/ventuno/runtime-layout
 image="$directory/pvstore.ext4"
 [ -f "$image" ] && [ ! -L "$image" ] || exit 3
@@ -31,6 +32,8 @@ if [ -f /etc/ventuno-pid1 ]; then
     # Pantavisor PID 1 owns its early mounts. Release our copies in this private
     # namespace, keeping console descriptors on a node in the initramfs itself.
     mknod -m 600 /ventuno-console c 5 1
+    # This is a character device, intentionally opened in both directions.
+    # shellcheck disable=SC2094
     exec </ventuno-console >/ventuno-console 2>&1
     umount /run
     umount /dev/pts

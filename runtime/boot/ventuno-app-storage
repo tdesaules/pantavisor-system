@@ -1,6 +1,8 @@
 #!/bin/sh
 # Mount only an already provisioned application disk. Never format at boot.
 set -eu
+# This configuration is generated for the selected device.
+# shellcheck source=/dev/null
 . /etc/ventuno-app-storage.conf
 target=/mnt/appdata
 mkdir -p "$target"

@@ -9,6 +9,7 @@ read -r init < /proc/1/comm
 if [ "${2:-}" != --inside ]; then
     exec nsenter -t 1 -m -- /usr/sbin/ventuno-pid1-shutdown "$id" --inside
 fi
+# shellcheck source=runtime-layout
 . /usr/lib/ventuno/runtime-layout
 [ "$(cat "$marker")" = "$id" ] || exit 3
 socket=/run/pantavisor/pv/pv-ctrl

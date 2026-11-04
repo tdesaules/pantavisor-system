@@ -1,0 +1,76 @@
+name: Cold BSP build and platform qualification
+on:
+  workflow_dispatch:
+    inputs:
+      core:
+        description: Core component GHCR reference pinned by digest
+        required: true
+        type: string
+      k0s:
+        description: k0s component GHCR reference pinned by digest
+        required: true
+        type: string
+      publish:
+        description: Publish the BSP after both profiles pass
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  packages: write
+concurrency: qualification
+jobs:
+  qualify:
+    runs-on: [self-hosted, linux, x64, pantavisor]
+    timeout-minutes: 720
+    defaults:
+      run:
+        working-directory: source-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source-${{ github.run_id }}-${{ github.run_attempt }}
+      - uses: oras-project/setup-oras@v1
+        with:
+          version: 1.2.2
+      - name: Cold build and fetch immutable components
+        env:
+          CORE: ${{ inputs.core }}
+          K0S: ${{ inputs.k0s }}
+        run: |
+          test ! -e artifacts
+          python3 -m tools.pvbuild check
+          env -u DOWNLOAD_CACHE -u SSTATE_CACHE python3 -m tools.pvbuild build
+          python3 -m tools.pvbuild package-bsp --output dist/bsp
+          python3 -m tools.pvbuild fetch-component --reference "$CORE" --output dist/core
+          python3 -m tools.pvbuild fetch-component --reference "$K0S" --output dist/k0s
+          python3 -m tools.pvbuild assemble --bsp dist/bsp --core dist/core --output dist/base-platform
+          python3 -m tools.pvbuild assemble --profile k0s --bsp dist/bsp --core dist/core --k0s dist/k0s --output dist/k0s-platform
+          python3 -m tools.pvbuild boot-tools --output artifacts/boot-tools
+      - name: Qualify both profiles with pinned QEMU
+        run: |
+          podman build -t localhost/pantavisor-system-tools:qualification -f build/Containerfile.tools build
+          for profile in base k0s; do
+            podman run --rm --security-opt label=disable -v "$PWD:/work" localhost/pantavisor-system-tools:qualification integration --bundle "dist/$profile-platform" --grub-modules artifacts/boot-tools/usr/lib/grub/arm64-efi --output "artifacts/qualification-$profile"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-reports
+          path: |
+            source-${{ github.run_id }}-${{ github.run_attempt }}/artifacts/qualification-*/results/*.json
+            source-${{ github.run_id }}-${{ github.run_attempt }}/artifacts/qualification-*/results/*.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bsp-public
+          path: source-${{ github.run_id }}-${{ github.run_attempt }}/dist/bsp/
+          if-no-files-found: error
+      - name: Publish BSP
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          test "$GITHUB_REF" = "refs/tags/v$(cat VERSION)"
+          printf '%s' "$GH_TOKEN" | oras login ghcr.io -u "$GH_ACTOR" --password-stdin
+          python3 -m tools.pvbuild publish-component dist/bsp --registry "ghcr.io/$REPOSITORY/bsp"

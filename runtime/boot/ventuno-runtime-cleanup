@@ -32,7 +32,7 @@ for signal in TERM KILL; do
 done
 failed=0
 : > /tmp/ventuno-unmount-failures
-while read -r source target type rest; do
+while read -r _source target _type _rest; do
     case "$target" in
         /volumes/*|/exports/*|/run/pantavisor/*|/usr/lib/lxc/rootfs*) echo "$target" ;;
     esac

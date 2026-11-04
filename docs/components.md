@@ -24,8 +24,10 @@ rootfs.squashfs
 rootfs.tar.gz
 packages.manifest
 sbom.spdx.tar.zst
+build-provenance.json
 ```
 
+Le schéma machine est [`schemas/component.schema.json`](../schemas/component.schema.json).
 Le descripteur déclare nom, version propre, architecture, ABI, capacités,
 provenance et inventaire des fichiers avec tailles et SHA-256. Son propre digest
 est calculé sur les octets de `component.json`. Il ne dépend pas de l'emplacement
@@ -45,6 +47,10 @@ System vérifie les empreintes, refuse les fichiers supplémentaires et les lien
 symboliques dans les exports, puis contrôle architecture, ABI et capacités.
 Les deux profils utilisent le même composant `core`, qui doit déclarer
 `kubernetes-clients`. Seul le profil k0s ajoute le serveur Kubernetes.
+Les champs `requires` et `provides` doivent correspondre au contrat runtime.
+System refuse une exigence absente de l'union des capacités BSP/composants.
+Ces déclarations de capacités ne remplacent pas la qualification fonctionnelle
+du noyau et des montages.
 
 Il n'exige pas l'égalité des versions ou commits. Une plateforme System 0.2.0
 peut utiliser un Core 0.8.1 et une intégration k0s 0.3.0 si leurs contrats restent
@@ -70,10 +76,10 @@ Le secours System conserve son propre réseau et ses binaires dans l'initramfs.
 Il n'a pas besoin de démarrer Core ou k0s. Les identifiants de disques et détails
 de l'eMMC/NVMe appartiennent exclusivement à System et aux paramètres privés.
 
-## Publication ultérieure
+## Publication
 
-Les images OCI sont construites localement par les producteurs. La définition
-des workflows, droits de publication, tags et catalogues distants est reportée
-à l'étape CI. Aucun tag ou digest de publication fictif n'est utilisé comme pin.
+Les workflows manuels construisent à froid et publient les images OCI et les
+composants ORAS après validation. Voir [automation.md](automation.md).
+Aucun tag ou digest de publication fictif n'est utilisé comme pin.
 Les dépendances amont existantes restent verrouillées par leurs vrais commits
 et checksums. Les métadonnées `source.dirty` signalent les builds locaux non committés.

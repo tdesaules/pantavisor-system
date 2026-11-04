@@ -4,6 +4,7 @@ set -eu
 id=${1:-}
 case "$id" in ''|*[!0-9a-f]*) exit 2 ;; esac
 [ "${#id}" -eq 32 ] && [ -f /etc/ventuno-pid1 ] || exit 2
+# shellcheck source=runtime-layout
 . /usr/lib/ventuno/runtime-layout
 if [ "${2:-}" != --inside ]; then
     nsenter -t 1 -m -- /usr/sbin/ventuno-storage-watch "$id" --inside
@@ -17,6 +18,7 @@ if [ "${2:-}" != --inside ]; then
     echo '<5>[VENTUNO] PANTAVISOR_NATIVE_SHUTDOWN_COMPLETE=1' > /dev/kmsg
     exit
 fi
+# shellcheck source=runtime-layout
 . /usr/lib/ventuno/runtime-layout
 [ "$(cat "$marker")" = "$id" ] || exit 3
 echo 'STORAGE_AUTOCLEAR_ARMED=1' >> "$logfile"

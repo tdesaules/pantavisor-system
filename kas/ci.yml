@@ -1,0 +1,12 @@
+header:
+  version: 16
+  includes:
+    - kas/system.yml
+local_conf_header:
+  # KAS sorts keys: these settings must follow the System configuration.
+  zz_hosted_ci: |
+    BB_NUMBER_THREADS = "2"
+    PARALLEL_MAKE = "-j 2"
+    INHERIT += "pantavisor-ci"
+    SSTATE_DIR = "${TOPDIR}/sstate-cache"
+    BB_DISKMON_DIRS = "STOPTASKS,${TMPDIR},1G,100K HALT,${TMPDIR},512M,50K"

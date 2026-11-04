@@ -9,6 +9,8 @@ case "${PV_OP:-}" in
         directory=/mnt/ubuntu-trial/boot/pantavisor
         [ ! -f /etc/ventuno-native ] || directory=/mnt/pv-system/boot/pantavisor
         for pair in 'kernel.img kernel' 'pantavisor initramfs'; do
+            # Split the two fixed literal filenames above, not external input.
+            # shellcheck disable=SC2086
             set -- $pair
             incoming=$(sha256sum "/storage/trails/$PV_TRY/bsp/$1")
             installed=$(sha256sum "$directory/$2")

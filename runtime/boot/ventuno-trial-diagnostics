@@ -5,6 +5,7 @@ set -u
 id=${1:-}
 case "$id" in ''|*[!0-9a-fA-F]*) exit 2 ;; esac
 [ "${#id}" -eq 32 ] && [ "${2:-}" = --mounted ] || exit 2
+# shellcheck source=runtime-layout
 . /usr/lib/ventuno/runtime-layout
 cleanup() { sync; exec >/dev/console 2>&1; umount "$root"; }
 trap cleanup EXIT

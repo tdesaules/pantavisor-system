@@ -9,6 +9,8 @@ case "${1:-}" in
         rm -f /run/ventuno-dhcp.state
         ;;
     bound|renew)
+        # BusyBox udhcpc supplies ip for bound/renew callbacks.
+        # shellcheck disable=SC2154
         ifconfig "$interface" "$ip" netmask "${subnet:-255.255.255.0}" up
         gateway=${router:-}
         gateway=${gateway%% *}

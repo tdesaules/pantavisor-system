@@ -111,9 +111,9 @@ podman run --rm --security-opt label=disable -v "$PWD:/work" \
 ```
 
 Ce harnais utilise uniquement des VM locales, des UUID fictifs, un serveur NTP
-local et des clés éphémères. Il teste la base : boot, reboot, persistance, secours,
-console, partition absente/illisible et coupure simulée. Le profil k0s est rendu
-et vérifié localement ; sa qualification complète de cluster reste distincte.
+local et des clés éphémères. Il teste boot, reboot, persistance, secours,
+console, partition absente/illisible et coupure simulée. Le profil k0s ajoute les
+contrôles API/nœud Ready, DNS, trafic entre pods et PVC après reboot.
 
 Avec le Core unique incluant les clients Kubernetes, le scénario nominal a été
 validé avec QEMU 10.2.2 sur le poste. L'essai dans l'image d'outillage QEMU 8.2
@@ -128,8 +128,13 @@ Ces versions ne remplacent pas implicitement les anciennes révisions d'une cart
 Le BSP reste épinglé au noyau 6.8.0-1084-qcom. La VENTUNO Q nécessite la chaîne
 EFI reconnue par son firmware ; les mises à jour atomiques BSP/ESP et l'incident
 de reset du portage précédent ne sont pas considérés résolus par le découpage.
-La carte n'a pas été contactée pendant cette extraction. La CI et la publication
-des trois dépôts seront traitées ensuite.
+La carte n'a pas été contactée pendant cette extraction. Les workflows CI,
+builds froids et publication sont décrits dans [automation.md](docs/automation.md).
+Le [diagnostic matériel](docs/hardware-qualification.md) et le
+[prototype de mise à jour A/B](docs/updates.md) restent à qualifier sur carte.
 
 Voir [les contrats et frontières](docs/components.md) et
 [la validation locale](docs/validation.md).
+
+La [migration CI vers les Docker Actions](docs/ci-migration.md) précise l'ordre
+d'activation, les références des producteurs et les preuves de qualification.
