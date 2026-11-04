@@ -11,7 +11,8 @@ class ComponentsTests(unittest.TestCase):
         directory = parent / name
         directory.mkdir()
         metadata = {'schema': 2, 'name': name, 'version': version, 'architecture': architecture,
-                    'source': {'repository': 'test/' + name, 'commit': name}, 'features': []}
+                    'source': {'repository': 'test/' + name, 'commit': name, 'dirty': True, 'treeSha256': '0' * 64}, 'features': [], 'provides': []}
+        (directory / 'build-provenance.json').write_bytes(canonical({'schema': 1, 'source': metadata['source']}))
         if name == 'bsp':
             metadata.update(kind='bsp', bootContracts=['emmc-file-store-v1'])
             (directory / 'bsp.json').write_bytes(canonical({'bootContracts': ['emmc-file-store-v1']}))
@@ -19,10 +20,10 @@ class ComponentsTests(unittest.TestCase):
                 (directory / name).write_bytes(b'fixture')
         else:
             abi = abi or ('pantavisor-k0s-v1' if name == 'k0s' else 'pantavisor-core-v1')
-            metadata.update(kind='rootfs', runtimeABI=abi)
+            metadata.update(kind='rootfs', runtimeABI=abi, requires=[], provides=[])
             if name == 'core': metadata['features'] = ['kubernetes-clients']
-            (directory / 'runtime.json').write_bytes(canonical({'id': abi, 'architecture': architecture}))
-            for filename in ('rootfs.squashfs', 'lxc.conf.in', 'packages.manifest', 'sbom.spdx.tar.zst'):
+            (directory / 'runtime.json').write_bytes(canonical({'schema': 1, 'id': abi, 'architecture': architecture, 'requires': [], 'provides': []}))
+            for filename in ('rootfs.squashfs', 'rootfs.tar.gz', 'lxc.conf.in', 'packages.manifest', 'sbom.spdx.tar.zst'):
                 (directory / filename).write_bytes(b'fixture')
             metadata['rootfsSha256'] = digest(directory / 'rootfs.squashfs')
         metadata['files'] = {p.name: {'sha256': digest(p), 'size': p.stat().st_size} for p in directory.iterdir()}
@@ -101,3 +102,24 @@ class ComponentsTests(unittest.TestCase):
                 path = Path(temporary) / 'override.json'
                 path.write_bytes(canonical({'containers': {'k0s': patch}}))
                 with self.assertRaises(ValueError): compose('k0s', overrides=[path])
+
+    def test_missing_platform_capability_is_rejected(self):
+        from tools.pvbuild.components import compatibility
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bsp = verify_component(self.component(root, 'bsp'))
+            core = verify_component(self.component(root, 'core'))
+            core['requires'] = ['clock-control']
+            with self.assertRaisesRegex(ValueError, 'clock-control'):
+                compatibility(compose('base'), {'bsp': bsp, 'core': core})
+            bsp['provides'] = ['clock-control']
+            compatibility(compose('base'), {'bsp': bsp, 'core': core})
+
+    def test_symlink_descriptor_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            core = self.component(root, 'core')
+            (core / 'component.json').rename(root / 'metadata.json')
+            (core / 'component.json').symlink_to(root / 'metadata.json')
+            with self.assertRaisesRegex(ValueError, 'Symbolic'):
+                verify_component(core)

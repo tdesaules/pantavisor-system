@@ -14,14 +14,17 @@ KAS_IMAGE = 'ghcr.io/siemens/kas/kas@sha256:22c70f90e21997c0b6743ad2d802cf1d942c
 
 
 def run_build():
+    from .provenance import run
     for name in ('downloads', 'sstate-cache', 'build/system'):
         (ROOT / 'artifacts' / name).mkdir(parents=True, exist_ok=True)
     mounts = []
     for variable, target in (('DOWNLOAD_CACHE', 'downloads'), ('SSTATE_CACHE', 'sstate-cache')):
         if os.environ.get(variable): mounts += ['-v', str(Path(os.environ[variable]).resolve()) + ':/work/artifacts/' + target]
-    subprocess.run(['podman', 'run', '--rm', '--userns=keep-id:uid=30000,gid=30000', '--security-opt', 'label=disable',
+    run(['podman', 'run', '--rm', '--userns=keep-id:uid=30000,gid=30000', '--security-opt', 'label=disable',
         '-v', str(ROOT) + ':/work', *mounts, '-w', '/work', '-e', 'KAS_WORK_DIR=/work',
-        '-e', 'KAS_BUILD_DIR=/work/artifacts/build/system', KAS_IMAGE, 'build', '/work/kas/system.yml'], check=True)
+        '-e', 'KAS_BUILD_DIR=/work/artifacts/build/system', KAS_IMAGE, 'build', '/work/kas/system.yml'],
+        ROOT / 'artifacts/build/system/tmp/deploy/images/ventuno-q',
+        ['pantavisor-initramfs-ventuno-q.' + suffix for suffix in ('cpio.gz', 'spdx.tar.zst')])
 
 
 def source_info():
@@ -81,7 +84,8 @@ def package_bsp(destination, deploy=None):
     destination = Path(destination)
     deploy = Path(deploy) if deploy else ROOT / 'artifacts/build/system/tmp/deploy/images/ventuno-q'
     initramfs = deploy / 'pantavisor-initramfs-ventuno-q.cpio.gz'
-    source = source_info()
+    from .provenance import read
+    source = read(deploy)['source']
     lock = load(ROOT / 'boards/ventuno-q/platform.lock.json')
     policy = load(ROOT / lock['selection'])
     cache = Path(os.environ.get('VENDOR_CACHE', str(ROOT / 'artifacts/vendor-packages')))
@@ -121,6 +125,7 @@ def package_bsp(destination, deploy=None):
         deterministic_tar(selected, destination / 'vendor-root.tar.gz', source['epoch'])
         shutil.copyfile(selected / 'boot' / ('vmlinuz-' + release), destination / 'kernel.img')
     shutil.copyfile(initramfs, destination / 'initramfs-base.cpio.gz')
+    shutil.copyfile(deploy / 'build-provenance.json', destination / 'build-provenance.json')
     shutil.copyfile(deploy / 'pantavisor-initramfs-ventuno-q.spdx.tar.zst', destination / 'sbom.spdx.tar.zst')
     (destination / 'selection.json').write_bytes(canonical(policy))
     (destination / 'selection-result.json').write_bytes(canonical(selection))
@@ -136,7 +141,7 @@ def package_bsp(destination, deploy=None):
         'deviceProvisioningRequired': True, 'bootContract': contracts[0], 'bootContracts': contracts}))
     (destination / 'component.json').write_bytes(canonical({'schema': 2, 'kind': 'bsp', 'name': 'bsp',
         'version': version((ROOT / 'VERSION').read_text().strip()), 'architecture': 'arm64',
-        'source': source, 'bootContracts': contracts,
+        'source': source, 'bootContracts': contracts, 'provides': load(ROOT / 'boards/ventuno-q/board.json')['provides'],
         'files': {p.relative_to(destination).as_posix(): {'sha256': digest(p), 'size': p.stat().st_size}
                   for p in sorted(destination.rglob('*')) if p.is_file()}}))
     verify_component(destination)

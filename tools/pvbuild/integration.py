@@ -34,14 +34,17 @@ def integration(bundle_path, modules, output, scenarios=None):
     from .native_test import SCENARIOS, qualify
     bundle_path, output = Path(bundle_path).resolve(), Path(output).resolve()
     bundle = verify_bundle(bundle_path)
-    if bundle['profile'] != 'base': raise ValueError('This local harness currently qualifies the base profile')
+    cluster = bundle['profile'] == 'k0s'
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
     client = output / 'client'
     subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(client)], check=True)
     system_uuid = str(uuid.uuid4())
     device = output / 'device.json'
-    device.write_bytes(canonical({'schema': 1, 'rootUUID': system_uuid, 'memoryKiB': 2 * 1024**2,
-        'ethernetMAC': '02:00:00:00:00:01', 'authorizedKeys': [client.with_suffix('.pub').read_text().strip()]}))
+    inputs = {'schema': 1, 'rootUUID': system_uuid, 'memoryKiB': (8 if cluster else 2) * 1024**2,
+        'ethernetMAC': '02:00:00:00:00:01', 'authorizedKeys': [client.with_suffix('.pub').read_text().strip()]}
+    if cluster:
+        inputs['appStorage'] = {'uuid': str(uuid.uuid4()), 'partuuid': str(uuid.uuid4()), 'serial': 'qemu-qualification'}
+    device.write_bytes(canonical(inputs))
     server = socketserver.ThreadingUDPServer(('127.0.0.1', 0), NTPHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
@@ -53,7 +56,8 @@ def integration(bundle_path, modules, output, scenarios=None):
         core_name = bundle['composition']['containers']['core']['artifact']
         core = bundle_path / bundle['components'][core_name]['directory']
         assembled = output / 'platform'
-        assemble(bsp, core, None, assembled, bundle['version'], 'base', [override])
+        k0s = bundle_path / bundle['components']['k0s']['directory'] if cluster else None
+        assemble(bsp, core, k0s, assembled, bundle['version'], bundle['profile'], [override])
         state = output / 'state'
         render(assembled, device, state)
         package = output / 'package'

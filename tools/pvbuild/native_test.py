@@ -15,10 +15,11 @@ SCENARIOS = ('missing-system', 'unreadable-system', 'missing-store', 'invalid-en
 
 
 def qualify(package, key, public_key, output, scenarios=SCENARIOS):
+    from .environment import qualification_environment
+    environment = qualification_environment()
     if not scenarios or set(scenarios) - set(SCENARIOS): raise ValueError('Unknown native test scenario')
     metadata = load(package / 'installation.json')
-    if metadata.get('profile') != 'base':
-        raise ValueError('The current native VM fixture supports the base profile only')
+    cluster = metadata.get('profile') == 'k0s'
     mac = metadata['ethernetMAC']
     if not re.fullmatch(r'(?:[0-9a-f]{2}:){5}[0-9a-f]{2}', mac): raise ValueError('Invalid fixture MAC')
     if not metadata['emulated']:
@@ -27,6 +28,7 @@ def qualify(package, key, public_key, output, scenarios=SCENARIOS):
         if name.startswith('/') or '..' in Path(name).parts or digest(package / name) != checksum:
             raise ValueError('Native package checksum mismatch')
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
+    (output / 'environment.json').write_bytes(canonical(environment))
     known = output / 'known_hosts'
     known.write_text('ventuno-native-test ' + public_key + '\n')
     efi = output / 'efi/EFI/BOOT'
@@ -59,7 +61,7 @@ def qualify(package, key, public_key, output, scenarios=SCENARIOS):
         shutil.copyfile(package / 'esp/EFI/ventuno' / name, efi / 'BOOTAA64.EFI')
         support = output / (scenario + '.ext4')
         command = ['qemu-system-aarch64', '-machine', 'virt,gic-version=3', '-cpu', 'cortex-a57',
-                   '-m', '2048', '-smp', '2', '-display', 'none', '-serial', 'stdio', '-monitor', 'none',
+                    '-m', str(metadata.get('memoryMiB', 2048)), '-smp', '4' if cluster else '2', '-display', 'none', '-serial', 'stdio', '-monitor', 'none',
                    '-bios', efi_firmware()]
         if scenario == 'normal': command += ['-rtc', 'base=1970-01-01T00:00:00']
         if scenario not in ('missing-system', 'dedicated-recovery'):
@@ -78,6 +80,17 @@ def qualify(package, key, public_key, output, scenarios=SCENARIOS):
         command += ['-drive', f'file=fat:ro:{efi.parents[1]},format=raw,if=virtio,readonly=on',
                     '-netdev', f'user,id=net0,hostfwd=tcp:127.0.0.1:{port}-:2222',
                     '-device', f'virtio-net-pci,netdev=net0,romfile=,mac={mac}']
+        if cluster:
+            application = output / (scenario + '-applications.ext4')
+            with application.open('xb') as stream: stream.truncate(12 * 1024**3)
+            with tempfile.TemporaryDirectory(dir=output) as temporary:
+                seed = Path(temporary)
+                for name in ('data', 'workloads', 'access', 'log'):
+                    (seed / 'perm/k0s' / name).mkdir(parents=True, mode=0o700)
+                storage_uuid = metadata['appStorage']['uuid']
+                (seed / '.ventuno-app-storage').write_text('ventuno-appdata-v1 ' + storage_uuid + '\n')
+                subprocess.run(['mkfs.ext4', '-q', '-F', '-U', storage_uuid, '-E', 'lazy_itable_init=0,lazy_journal_init=0', '-d', str(seed), str(application)], check=True)
+            command += ['-drive', f'file={application},format=raw,if=virtio']
         console = output / (scenario + '.log')
         with console.open('wb') as log:
             process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=log, stderr=subprocess.STDOUT)
@@ -98,12 +111,18 @@ def qualify(package, key, public_key, output, scenarios=SCENARIOS):
                     if abs(synchronized - time.time()) > 60:
                         raise RuntimeError('Core did not synchronize the VM clock')
                     first = request('cat /proc/sys/kernel/random/boot_id; cat /data/boots').stdout.strip()
+                    if cluster:
+                        from . import cluster_test
+                        fixture = cluster_test.start(request, wait, process)
                     request('pvcontrol cmd reboot')
                     time.sleep(10)
                     wait(process, 'test "$(cat /data/boots)" = 2 && echo SECOND_BOOT', 'SECOND_BOOT')
                     wait(process, 'cat /trial-status/health.status', 'ready=1')
                     second = request('cat /proc/sys/kernel/random/boot_id; cat /data/boots').stdout.strip()
                     if first.splitlines()[0] == second.splitlines()[0]: raise RuntimeError('Reboot did not change boot ID')
+                    if cluster:
+                        results['k0s-persistence'] = cluster_test.check(request, wait, process, fixture, persisted=True)
+                        cluster_test.cleanup(request, fixture)
                     request("set -e; printf 'recovery\\n' > /run/platform/next; pvcontrol cmd reboot")
                     time.sleep(10)
                     results['normal-reboot'] = {'first': first, 'second': second, 'health': ready}
@@ -125,6 +144,16 @@ def qualify(package, key, public_key, output, scenarios=SCENARIOS):
                 else:
                     raise RuntimeError('Recovery serial console did not execute the test command')
                 results[scenario] = observed
+            except Exception as error:
+                failure = {'scenario': scenario, 'error': str(error), 'completed': results}
+                try:
+                    diagnostic = request('cat /trial-status/guard.status /trial-status/health.status /k0s-access/status /k0s-access/resources.status 2>&1; '
+                                         'kubectl --kubeconfig=/k0s-access/admin.conf --request-timeout=5s get pods -A -o wide 2>&1')
+                    failure['diagnostics'] = diagnostic.stdout + diagnostic.stderr
+                except subprocess.TimeoutExpired:
+                    failure['diagnostics'] = 'SSH diagnostics timed out'
+                (output / 'failure.json').write_bytes(canonical(failure))
+                raise
             finally:
                 process.stdin.close()
                 process.terminate()

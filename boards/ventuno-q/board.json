@@ -3,6 +3,7 @@
   "architecture": "arm64",
   "machine": "ventuno-q",
   "bootContracts": ["emmc-file-store-v1"],
+  "provides": ["pantavisor-mgmt-api", "host-network", "cgroup-v2", "clock-control", "delegated-cgroup-v2", "nested-containers", "kernel-modules", "kernel-config"],
   "statusSource": "/ventuno-trial",
   "controlSource": "/ventuno-trial/control",
   "applicationSource": "/mnt/appdata/perm/k0s",

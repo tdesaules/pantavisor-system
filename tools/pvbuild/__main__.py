@@ -30,6 +30,9 @@ def main():
     p = commands.add_parser('fetch-component')
     p.add_argument('--reference', required=True)
     p.add_argument('--output', type=Path, required=True)
+    p = commands.add_parser('publish-component')
+    p.add_argument('path', type=Path)
+    p.add_argument('--registry', required=True)
     p = commands.add_parser('render')
     p.add_argument('--bundle', type=Path, required=True)
     p.add_argument('--device', type=Path, required=True)
@@ -48,12 +51,20 @@ def main():
     p.add_argument('--state', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--scenario', action='append')
-    p = commands.add_parser('integration', help='Isolated local VM with ephemeral inputs (base profile)')
+    p = commands.add_parser('integration', help='Isolated local base/k0s VM with ephemeral inputs')
     p.add_argument('--bundle', type=Path, required=True)
     p.add_argument('--grub-modules', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--scenario', action='append')
     commands.add_parser('check')
+    p = commands.add_parser('diagnostics', help='Read-only board sampling over SSH')
+    p.add_argument('--host', required=True)
+    p.add_argument('--port', type=int, default=2222)
+    p.add_argument('--ssh-key', type=Path, required=True)
+    p.add_argument('--known-hosts', type=Path, required=True)
+    p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--samples', type=int, default=60)
+    p.add_argument('--interval', type=int, default=10)
     args = parser.parse_args()
     (ROOT / 'artifacts').mkdir(exist_ok=True)
     if args.command == 'build':
@@ -77,6 +88,9 @@ def main():
     elif args.command == 'fetch-component':
         from .fetch import fetch
         print(fetch(args.reference, args.output))
+    elif args.command == 'publish-component':
+        from .publish import publish
+        print(publish(args.path, args.registry))
     elif args.command == 'render':
         from .render import render
         print(render(args.bundle, args.device, args.output))
@@ -94,6 +108,9 @@ def main():
     elif args.command == 'integration':
         from .integration import integration
         integration(args.bundle, args.grub_modules, args.output, args.scenario)
+    elif args.command == 'diagnostics':
+        from .diagnostics import collect
+        print(collect(args.host, args.port, args.ssh_key, args.known_hosts, args.output, args.samples, args.interval))
 
 
 if __name__ == '__main__':

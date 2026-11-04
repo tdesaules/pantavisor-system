@@ -210,6 +210,8 @@ def prepare(state_directory, system_uuid, modules, output, *, emulated=False, si
         'schema': 1, 'bootContract': 'emmc-file-store-v1', 'private': True,
         'systemUUID': system_uuid, 'espUUID': esp_uuid, 'installId': install_id, 'revision': revision,
         'profile': metadata['composition']['profile'],
+        'memoryMiB': metadata.get('memoryKiB', 2 * 1024**2) // 1024,
+        'appStorage': metadata.get('appStorage'),
         'ethernetMAC': metadata['ethernetMAC'],
         'stateSha256': metadata['stateSha256'], 'emulated': emulated,
         'files': {str(path.relative_to(output)): digest(path) for path in sorted(output.rglob('*')) if path.is_file()}}))

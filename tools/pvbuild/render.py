@@ -135,6 +135,7 @@ def render(directory, device_path, output):
     (output / 'device-state.json').write_bytes(canonical({'schema': 1, 'kind': 'private-device-state',
         'version': bundle['version'], 'revision': 'locals/' + bundle['version'], 'composition': composition,
         'ethernetMAC': device['ethernetMAC'],
+        'memoryKiB': device['memoryKiB'], 'appStorage': device.get('appStorage'),
         'components': {name: {'version': item['metadata']['version'], 'digest': item['digest'], 'source': item['metadata']['source']}
                        for name, item in bundle['components'].items()},
         'stateSha256': digest(output / 'state.json'), 'sshHostPublicKey': public,

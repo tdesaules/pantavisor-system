@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pantavisor public component v2",
+  "type": "object",
+  "required": ["schema", "kind", "name", "version", "architecture", "source", "files"],
+  "properties": {
+    "schema": {"const": 2},
+    "kind": {"enum": ["rootfs", "bsp"]},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+    "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "architecture": {"const": "arm64"},
+    "source": {"type": "object", "required": ["repository", "commit", "dirty", "treeSha256"], "properties": {
+      "repository": {"type": "string"}, "commit": {"type": "string"}, "dirty": {"type": "boolean"},
+      "treeSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    }},
+    "requires": {"$ref": "#/$defs/capabilities"},
+    "provides": {"$ref": "#/$defs/capabilities"},
+    "files": {"type": "object", "additionalProperties": {
+      "type": "object", "required": ["sha256", "size"], "properties": {
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "size": {"type": "integer", "minimum": 0}
+      }
+    }}
+  },
+  "$defs": {"capabilities": {"type": "array", "uniqueItems": true,
+    "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}}},
+  "allOf": [
+    {"if": {"properties": {"kind": {"const": "rootfs"}}}, "then": {
+      "required": ["runtimeABI", "rootfsSha256", "features", "requires", "provides"],
+      "properties": {"files": {"required": ["rootfs.squashfs", "rootfs.tar.gz", "runtime.json", "lxc.conf.in", "packages.manifest", "sbom.spdx.tar.zst", "build-provenance.json"]}}
+    }},
+    {"if": {"properties": {"kind": {"const": "bsp"}}}, "then": {
+      "required": ["bootContracts", "provides"],
+      "properties": {"files": {"required": ["bsp.json", "kernel.img", "initramfs-base.cpio.gz", "vendor-root.tar.gz", "selection.json", "sbom.spdx.tar.zst", "build-provenance.json"]}}
+    }}
+  ]
+}

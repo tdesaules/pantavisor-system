@@ -1,11 +1,28 @@
 # Local packaging/validation tools, not an image deployed on the board.
+FROM docker.io/library/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 AS qemu
+# Local build tools track distro security updates; QEMU itself is checksum-pinned.
+# hadolint ignore=DL3008
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    build-essential ca-certificates curl libfdt-dev libglib2.0-dev libpixman-1-dev libslirp-dev ninja-build python3 python3-venv python3-tomli xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN curl -fL https://download.qemu.org/qemu-10.2.2.tar.xz -o qemu.tar.xz \
+    && echo '784b296ff29c1417aa72323abcb2d2ea9ab9771724f577dcd785c3b04f21e176  qemu.tar.xz' | sha256sum -c - \
+    && tar -xf qemu.tar.xz --strip-components=1 \
+    && ./configure --prefix=/opt/qemu --target-list=aarch64-softmmu,aarch64-linux-user --disable-docs --disable-tools --disable-guest-agent --enable-slirp \
+    && make -j4 && make install
 FROM docker.io/library/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 AS tools
+# hadolint ignore=DL3008
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     binutils ca-certificates cpio e2fsprogs git grub-common kmod openssh-client python3 \
-    qemu-efi-aarch64 qemu-system-arm qemu-user squashfs-tools tar zstd \
+    libfdt1 libglib2.0-0t64 libpixman-1-0 libslirp0 qemu-efi-aarch64 squashfs-tools tar zstd \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /work
+COPY --from=qemu /opt/qemu /opt/qemu
+ENV PATH="/opt/qemu/bin:${PATH}"
 # Extraction must preserve system ownership inside the rootless user namespace.
+# hadolint ignore=DL3002
 USER 0:0
 ENTRYPOINT ["python3", "-m", "tools.pvbuild"]
 LABEL org.opencontainers.image.title="Pantavisor System build tooling" \
