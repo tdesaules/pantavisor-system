@@ -51,9 +51,10 @@ non prouvée. Les sorties privées de VM ne sont jamais publiées.
 
 ## Configuration et surveillance
 
-Installer l'App de release sur le dépôt, configurer `RELEASE_APP_ID` et
-`RELEASE_APP_PRIVATE_KEY`. Configurer séparément le bot `RENOVATE_TOKEN`, en
-évitant une seconde instance hébergée. Pour des packages privés, donner au token
+Installer l'App partagée sur le dépôt, configurer la variable `BOT_APP_ID` et
+le secret `BOT_APP_PRIVATE_KEY`. Le workflow généré utilise aussi cette App pour
+Renovate, avec les droits d'écriture sur le contenu et les pull requests, sans
+`RENOVATE_TOKEN` séparé. Éviter une seconde instance hébergée. Pour des packages privés, donner au token
 du workflow System l'accès en lecture aux packages Core/k0s.
 
 Surveiller l'espace libre et la durée du build, la vérification des digests et
