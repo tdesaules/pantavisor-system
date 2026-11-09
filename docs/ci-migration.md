@@ -3,6 +3,11 @@
 System est activé après le catalogue, Core et k0s. Il faut deux références de
 composants ORAS réellement publiées par digest, pas leurs images OCI exécutables.
 
+Activation préparée le 9 novembre 2026 : catalogue `1.6.1`, composants Core et
+k0s issus des releases `v0.1.2`. Les digests résolus sont conservés dans
+`compositions/components.json`. Actionlint, YAML et les tests Python locaux ont
+réussi ; la qualification hébergée des profils `base` et `k0s` reste à exécuter.
+
 Depuis le checkout `github-actions`, avec Python, `gh` et ORAS :
 
 ```sh

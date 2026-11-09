@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "core": "ghcr.io/tdesaules/pantavisor-core/component@sha256:fc19c002b42a5130a771efc0549d8fcce18465fb8f2274232b919abeb61981c3",
+  "k0s": "ghcr.io/tdesaules/pantavisor-k0s/component@sha256:f24aafedaf7067a5f921a86a831ee36eee8c086d05f8ebf134c0d851ed6d9af1"
+}
