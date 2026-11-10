@@ -1,6 +1,8 @@
 """Functional checks performed through Core's kubectl, before and after reboot."""
 import json
 import shlex
+import subprocess
+import time
 import uuid
 
 IMAGE = 'docker.io/library/busybox@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e'
@@ -31,13 +33,34 @@ def resources(name):
     ]}
 
 
+def apply_fixture(request, process, payload, seconds=300):
+    # Reapply the same named resources after transient API/SSH timeouts. Keep
+    # kubectl's schema validation enabled and fail immediately on other errors.
+    command = 'printf %s ' + shlex.quote(payload) + ' | ' + KUBECTL + 'apply -f -'
+    deadline = time.monotonic() + seconds
+    last_error = 'No API response'
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError('QEMU exited during cluster fixture creation')
+        try:
+            result = request(command)
+            if result.returncode == 0:
+                return
+            last_error = result.stderr
+            if not any(reason in last_error for reason in ('context deadline exceeded', 'i/o timeout', 'TLS handshake timeout')):
+                raise RuntimeError('Cluster fixture creation failed: ' + last_error)
+        except subprocess.TimeoutExpired:
+            last_error = 'SSH command timed out while applying cluster fixture'
+        time.sleep(2)
+    raise RuntimeError('Cluster fixture creation timed out: ' + last_error)
+
+
 def start(request, wait, process):
     wait(process, KUBECTL + 'get --raw=/readyz', 'ok', seconds=900)
     wait(process, KUBECTL + 'wait --for=condition=Ready nodes --all --timeout=5s', 'condition met', seconds=900)
     name = 'qualification-' + uuid.uuid4().hex[:12]
     payload = json.dumps(resources(name))
-    result = request('printf %s ' + shlex.quote(payload) + ' | ' + KUBECTL + 'apply -f -')
-    if result.returncode: raise RuntimeError('Cluster fixture creation failed: ' + result.stderr)
+    apply_fixture(request, process, payload)
     check(request, wait, process, name)
     # Replace the initial token with a unique persisted value; an empty volume
     # after reboot must not pass merely because the server recreated its data.
