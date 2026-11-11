@@ -6,7 +6,8 @@ import time
 import uuid
 
 IMAGE = 'docker.io/library/busybox@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e'
-KUBECTL = 'kubectl --kubeconfig=/k0s-access/admin.conf --request-timeout=10s '
+KUBECTL_BASE = 'kubectl --kubeconfig=/k0s-access/admin.conf '
+KUBECTL = KUBECTL_BASE + '--request-timeout=10s '
 
 
 def resources(name):
@@ -36,18 +37,21 @@ def resources(name):
 def apply_fixture(request, process, payload, seconds=300):
     # Reapply the same named resources after transient API/SSH timeouts. Keep
     # kubectl's schema validation enabled and fail immediately on other errors.
-    command = 'printf %s ' + shlex.quote(payload) + ' | ' + KUBECTL + 'apply -f -'
+    # OpenAPI discovery is heavier than readiness probes in an emulated VM.
+    command = 'printf %s ' + shlex.quote(payload) + ' | ' + KUBECTL_BASE + '--request-timeout=60s apply -f -'
     deadline = time.monotonic() + seconds
     last_error = 'No API response'
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise RuntimeError('QEMU exited during cluster fixture creation')
         try:
-            result = request(command)
+            result = request(command, timeout=min(75, max(1, deadline - time.monotonic())))
             if result.returncode == 0:
                 return
             last_error = result.stderr
-            if not any(reason in last_error for reason in ('context deadline exceeded', 'i/o timeout', 'TLS handshake timeout')):
+            if not any(reason in last_error for reason in (
+                    'context deadline exceeded', 'i/o timeout', 'TLS handshake timeout',
+                    'Client.Timeout exceeded while awaiting headers')):
                 raise RuntimeError('Cluster fixture creation failed: ' + last_error)
         except subprocess.TimeoutExpired:
             last_error = 'SSH command timed out while applying cluster fixture'

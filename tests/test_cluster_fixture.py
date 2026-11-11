@@ -9,15 +9,18 @@ class ClusterFixtureTests(unittest.TestCase):
     def test_transient_timeout_reuses_identical_validated_manifest(self):
         request = Mock(side_effect=[
             subprocess.CompletedProcess([], 1, '', 'OpenAPI: context deadline exceeded'),
+            subprocess.CompletedProcess([], 1, '', 'net/http: request canceled (Client.Timeout exceeded while awaiting headers)'),
             subprocess.TimeoutExpired('ssh', 15),
             subprocess.CompletedProcess([], 0, 'created', ''),
         ])
-        with patch.object(cluster_test.time, 'monotonic', side_effect=[0, 0, 1, 2]), \
+        with patch.object(cluster_test.time, 'monotonic', return_value=0), \
                 patch.object(cluster_test.time, 'sleep'):
             cluster_test.apply_fixture(request, Mock(poll=Mock(return_value=None)), '{"kind":"List"}')
-        self.assertEqual(request.call_count, 3)
-        self.assertEqual(request.call_args_list, [request.call_args] * 3)
+        self.assertEqual(request.call_count, 4)
+        self.assertEqual(request.call_args_list, [request.call_args] * 4)
         self.assertIn('apply -f -', request.call_args.args[0])
+        self.assertIn('--request-timeout=60s', request.call_args.args[0])
+        self.assertEqual(request.call_args.kwargs['timeout'], 75)
         self.assertNotIn('--validate=false', request.call_args.args[0])
 
     def test_invalid_manifest_is_not_retried(self):
@@ -28,7 +31,7 @@ class ClusterFixtureTests(unittest.TestCase):
 
     def test_persistent_timeout_remains_blocking(self):
         request = Mock(return_value=subprocess.CompletedProcess([], 1, '', 'context deadline exceeded'))
-        with patch.object(cluster_test.time, 'monotonic', side_effect=[0, 0, 301]), \
+        with patch.object(cluster_test.time, 'monotonic', side_effect=[0, 0, 0, 301]), \
                 patch.object(cluster_test.time, 'sleep'), \
                 self.assertRaisesRegex(RuntimeError, 'timed out: context deadline exceeded'):
             cluster_test.apply_fixture(request, Mock(poll=Mock(return_value=None)), '{}')
@@ -39,3 +42,9 @@ class ClusterFixtureTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'QEMU exited'):
             cluster_test.apply_fixture(request, Mock(poll=Mock(return_value=1)), '{}')
         request.assert_not_called()
+
+    def test_ssh_timeout_is_capped_by_remaining_budget(self):
+        request = Mock(return_value=subprocess.CompletedProcess([], 0, 'created', ''))
+        with patch.object(cluster_test.time, 'monotonic', side_effect=[0, 270, 270]):
+            cluster_test.apply_fixture(request, Mock(poll=Mock(return_value=None)), '{}')
+        self.assertEqual(request.call_args.kwargs['timeout'], 30)

@@ -40,8 +40,8 @@ def qualify(package, key, public_key, output, scenarios=SCENARIOS):
            '-o', 'StrictHostKeyChecking=yes', '-o', 'HostKeyAlias=ventuno-native-test',
            '-o', 'UserKnownHostsFile=' + str(known.resolve()), 'root@127.0.0.1']
 
-    def request(command):
-        return subprocess.run(ssh + [command], capture_output=True, text=True, timeout=15)
+    def request(command, timeout=15):
+        return subprocess.run(ssh + [command], capture_output=True, text=True, timeout=timeout)
 
     def wait(process, command, expected, seconds=240):
         end = time.monotonic() + seconds
